@@ -1,0 +1,52 @@
+name: AWS OIDC Connect demo
+
+on:
+  push:
+    branches:
+      - '*'
+
+
+env:
+  AWS_REGION: us-east-1
+permissions:
+      contents: read
+      id-token: write
+
+jobs:
+  deploy:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Print GitHub Context Info
+        run: |
+          echo "Repo: ${{ github.repository }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Actor: ${{ github.actor }}"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::905418381667:role/githun-oidc-role
+          role-session-name: github-actions-session
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Whoami
+        run: aws sts get-caller-identity
+
+      - name: Generate OIDC token
+        id: generate_token
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken();
+            core.setOutput("id_token", token);
+
+      - name: Debug OIDC claims
+        run: |
+          echo "${{ steps.generate_token.outputs.id_token }}" | cut -d '.' -f2 | base64 -d | jq
+        shell: bash
